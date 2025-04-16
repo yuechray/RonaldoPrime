@@ -42,5 +42,5 @@ class Settings(BaseModel):
 def get_app_settings() -> Settings:
     return Settings()
 
-settings=get_app_settings()
+
 
