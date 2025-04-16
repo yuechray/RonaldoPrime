@@ -3,7 +3,7 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
 from src.db.tables import Base
-
+from src.core.settings import get_app_settings
 
 SETTINGS = get_app_settings()
 DATABASE_URL = SETTINGS.postgres_dsn

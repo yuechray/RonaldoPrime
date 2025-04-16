@@ -41,7 +41,7 @@ class DeliveriesTable(Base):
     __tablename__ = "deliveries"
 
     deliveries_id: Mapped[int]  = mapped_column(primary_key=True)
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.products_id"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.product_id"))
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.store_id"))
     delivery_date: Mapped[datetime] = mapped_column (DateTime, nullable=False)
     product_count: Mapped[int] = mapped_column (Integer, nullable=False)
@@ -58,7 +58,7 @@ class CustomersTable(Base):
 class PurchasesTable(Base):
     __tablename__ = "purchases"
 
-    purchases_id: Mapped[int]  = mapped_column(primary_key=True)
+    purchase_id: Mapped[int]  = mapped_column(primary_key=True)
     customer_id: Mapped[int]  = mapped_column(ForeignKey("customers.customer_id"))
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.store_id"))
     purchase_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -67,8 +67,8 @@ class PurchaseItemsTable(Base):
     __tablename__ = "purchase_items"
 
     purchase_items_id: Mapped[int]  = mapped_column(primary_key=True)
-    purchases_id: Mapped[int]  = mapped_column(ForeignKey("purchase.purchase_id"))
-    product_id: Mapped[int] = mapped_column(ForeignKey("products.products_id"))
+    purchases_id: Mapped[int]  = mapped_column(ForeignKey("purchases.purchase_id"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.product_id"))
     product_count: Mapped[int] = mapped_column (Integer, nullable=False)
     product_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
 
