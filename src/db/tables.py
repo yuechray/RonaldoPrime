@@ -1,10 +1,10 @@
 from sqlalchemy import ForeignKey
 from sqlalchemy import String
 from sqlalchemy import Numeric
-from sqlalchemy import Date
+from sqlalchemy import DateTime
 from sqlalchemy import Integer
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
+from datetime import datetime
 
 class Base(DeclarativeBase):
     pass
@@ -34,7 +34,7 @@ class ProductsTable(Base):
     product_name: Mapped[str] = mapped_column(String(255), nullable=False)
     manufacturer_id: Mapped[int] = mapped_column(ForeignKey("manufacturers.manufacturer_id"))
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.category_id"))
-    date_price_change: Mapped[Date] = mapped_column(Date, nullable=False)
+    date_price_change: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     new_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
 
 class DeliveriesTable(Base):
@@ -43,7 +43,7 @@ class DeliveriesTable(Base):
     deliveries_id: Mapped[int]  = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("products.products_id"))
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.store_id"))
-    delivery_date: Mapped[Date] = mapped_column (Date, nullable=False)
+    delivery_date: Mapped[datetime] = mapped_column (DateTime, nullable=False)
     product_count: Mapped[int] = mapped_column (Integer, nullable=False)
 
 class CustomersTable(Base):
@@ -61,7 +61,7 @@ class PurchasesTable(Base):
     purchases_id: Mapped[int]  = mapped_column(primary_key=True)
     customer_id: Mapped[int]  = mapped_column(ForeignKey("customers.customer_id"))
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.store_id"))
-    purchase_date: Mapped[Date] = mapped_column(Date, nullable=False)
+    purchase_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 class PurchaseItemsTable(Base):
     __tablename__ = "purchase_items"
