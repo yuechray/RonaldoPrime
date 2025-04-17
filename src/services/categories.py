@@ -1,4 +1,4 @@
-from sqlalchemy import select, update as sql_update, delete as sql_delete
+from sqlalchemy import select,insert, update as sql_update, delete as sql_delete
 from src.db.tables import CategoriesTable
 from src.api.dependencies import SessionFactoryDependency
 
@@ -8,11 +8,10 @@ class CategoriesRepository:
 
     async def create(self, category_name: str) -> CategoriesTable:
         async with self.session_factory() as session:
-            new_category = CategoriesTable(category_name=category_name)
-            session.add(new_category)
+            query = insert(CategoriesTable).values(category_name=category_name).returning(CategoriesTable)
+            category=(await session.execute(query)).scalar_one_or_none()
             await session.commit()
-            await session.refresh(new_category)
-            return new_category
+            return category
 
     async def get_all(self) -> list[CategoriesTable]:
         async with self.session_factory() as session:
