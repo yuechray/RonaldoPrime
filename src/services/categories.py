@@ -12,6 +12,13 @@ class CategoriesRepository:
             category=(await session.execute(query)).scalar_one_or_none()
             await session.commit()
             return category
+        
+    async def create_sql(self, category_name: str) -> CategoriesTable:
+        async with self.session_factory() as session:
+            query = f"INSERT INTO categories ({category_name}) VALUES (:{category_name}) RETURNING categories.category_id, categories.category_name"
+            category=(await session.execute(query)).scalar_one_or_none()
+            await session.commit()
+            return category
 
     async def get_all(self) -> list[CategoriesTable]:
         async with self.session_factory() as session:
@@ -51,3 +58,7 @@ class CategoriesRepository:
             )
             await session.commit()
             return result.rowcount > 0
+        
+
+query = insert(CategoriesTable).values(category_name="s").returning(CategoriesTable)
+print(query)
