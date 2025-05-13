@@ -1,10 +1,7 @@
 from fastapi import FastAPI
-
+from src.api import auth
 
 app = FastAPI()
 
-@app.get("/home")
-def get_home():
-    return " SIU"
-
+app.include_router(auth.router)
 

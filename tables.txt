@@ -1,0 +1,61 @@
+categories — Категории товаров
+Поле	Тип	Назначение
+category_id	SERIAL (PK)	Уникальный идентификатор категории
+category_name	VARCHAR(100)	Название категории 
+
+
+ manufacturers — Производители
+Поле	Тип	Назначение
+manufacturer_id	SERIAL (PK)	Уникальный идентификатор производителя
+manufacturer_name VARCHAR(100)	Название производителя
+
+ products — Изделия
+Поле	Тип	Назначение
+product_id	SERIAL (PK)	Уникальный идентификатор изделия
+product_name	VARCHAR(255)	Название изделия
+manufacturer_id	BIGINT UNSIGNED	FK на manufacturers.manufacturer_id
+category_id	BIGINT UNSIGNED	FK на categories.category_id
+
+
+ price_change — История изменения цен
+Поле	Тип	Назначение
+product_id	BIGINT UNSIGNED	FK на products.product_id
+date_price_change	DATE	Дата изменения цены
+new_price	NUMERIC(9,2)	Установленная новая цена
+
+     Первичный ключ: составной — (product_id, date_price_change)
+
+
+ stores — Магазины
+Поле	Тип	Назначение
+store_id	SERIAL (PK)	Уникальный идентификатор магазина
+store_name	VARCHAR(255)	Название точки продаж
+
+ deliveries — Поставки изделий
+Поле	Тип	Назначение
+product_id	BIGINT UNSIGNED	FK на products.product_id
+store_id	BIGINT UNSIGNED	FK на stores.store_id
+delivery_date	DATE	Дата поставки
+product_count	INTEGER UNSIGNED	Количество доставленного товара
+
+ customers — Зарегистрированные покупатели (с авторизацией)
+Поле	Тип	Назначение
+customer_id	SERIAL (PK)	Уникальный идентификатор клиента
+customer_fname	VARCHAR(100)	Имя клиента
+customer_lname	VARCHAR(100)	Фамилия клиента
+email	VARCHAR(255)	Email клиента (логин, уникальный)
+password_hash	TEXT	Хешированный пароль
+
+ purchases — Покупки
+Поле	Тип	Назначение
+purchase_id	SERIAL (PK)	Уникальный ID покупки
+customer_id	BIGINT UNSIGNED	FK на customers.customer_id
+store_id	BIGINT UNSIGNED	FK на stores.store_id
+purchase_date	DATETIME	Дата и время покупки
+
+ purchase_items — Состав покупки
+Поле	Тип	Назначение
+purchase_id	BIGINT UNSIGNED	FK на purchases.purchase_id
+product_id	BIGINT UNSIGNED	FK на products.product_id
+product_count	BIGINT UNSIGNED	Кол-во купленного товара
+product_price	NUMERIC(9,2)	Цена за единицу на момент покупки
