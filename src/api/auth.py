@@ -1,22 +1,38 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from fastapi import APIRouter, Depends, HTTPException
+from passlib.hash import bcrypt
+from sqlalchemy.future import select
+from sqlalchemy import text
 from src.models.auth import LoginRequest
-from src.services.auth import authenticate_user
 from src.api.dependencies import SessionFactoryDependency
+from src.db.tables import CustomersTable
+
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/login")
 async def login(
     data: LoginRequest,
-    session_factory: SessionFactoryDependency,
+    session_factory: SessionFactoryDependency
 ):
+    email = data.email
+
     async with session_factory() as session:
-        user = await authenticate_user(data.email, data.password, session)
+        # Используем SQLAlchemy ORM для запроса
+        result = await session.execute(
+            select(CustomersTable).filter_by(email=email)
+        )
+        user = result.scalars().first()  # Получаем первый (и, возможно, единственный) результат
+
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверный email или пароль"
-            )
-        return {"message": "Успешный вход", "user_id": user.customer_id}
+            raise HTTPException(status_code=401, detail="Пользователь не найден")
+
+        # Проверяем пароль
+        if not bcrypt.verify(data.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Неверный пароль")
+
+        return {
+            "message": "Успешная авторизация",
+            "user_id": user.customer_id,
+            "name": user.customer_fname
+        }
+    

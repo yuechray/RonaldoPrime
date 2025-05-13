@@ -20,23 +20,34 @@ class LoginWindow(tk.Tk):
         tk.Button(self, text="Войти", command=self.login).pack(pady=30)
 
     def login(self):
-        username = self.username_entry.get()
+        email = self.username_entry.get()
         password = self.password_entry.get()
 
-        
-        if username == "admin" and password == "admin":  
-            self.destroy()
-            app = StoreApp()
-            app.mainloop()
-        else:
-            messagebox.showerror("Ошибка", "Неверный логин или пароль")
+        try:
+            response = requests.post("http://localhost:8000/auth/login", json={
+                "email": email,
+                "password": password
+            })
+
+            if response.status_code == 200:
+                data = response.json()
+                user_id = data["user_id"]
+                self.destroy()
+                app = StoreApp(user_id=user_id)
+                app.mainloop()
+            else:
+                messagebox.showerror("Ошибка", response.json().get("detail", "Ошибка авторизации"))
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Сервер недоступен:\n{e}")
 
 
 
 
 class StoreApp(tk.Tk):
-    def __init__(self):
+    def __init__(self,user_id: int):
         super().__init__()
+        self.user_id = user_id
+
         self.title("Магазин")
         self.geometry("700x500")
 
