@@ -17,16 +17,15 @@ async def login(
     email = data.email
 
     async with session_factory() as session:
-        # Используем SQLAlchemy ORM для запроса
+        
         result = await session.execute(
             select(CustomersTable).filter_by(email=email)
         )
-        user = result.scalars().first()  # Получаем первый (и, возможно, единственный) результат
-
+        user = result.scalars().first()  
         if not user:
             raise HTTPException(status_code=401, detail="Пользователь не найден")
 
-        # Проверяем пароль
+        
         if not bcrypt.verify(data.password, user.password_hash):
             raise HTTPException(status_code=401, detail="Неверный пароль")
 
