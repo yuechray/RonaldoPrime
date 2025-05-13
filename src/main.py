@@ -1,5 +1,10 @@
-from src.core.settings import get_app_settings
+from fastapi import FastAPI
 
-settings=get_app_settings()
 
-print(settings.postgres_dsn)
+app = FastAPI()
+
+@app.get("/home")
+def get_home():
+    return " SIU"
+
+
