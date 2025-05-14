@@ -391,7 +391,7 @@ class StoreApp(tk.Tk):
             messagebox.showerror("Ошибка", f"Не удалось загрузить историю покупок:\n{e}")
 
     def on_purchase_select(self, event):
-        # Очищаем текущие детали
+        
         for item in self.details_tree.get_children():
             self.details_tree.delete(item)
 
@@ -402,7 +402,7 @@ class StoreApp(tk.Tk):
         purchase_id = self.purchases_tree.item(selected_items[0])["values"][0]
 
         try:
-            # Получаем информацию о покупке
+            
             response = requests.get(f"http://localhost:8000/purchases/user/{self.user_id}")
             purchases = response.json()
             
@@ -410,25 +410,25 @@ class StoreApp(tk.Tk):
             if not purchase:
                 return
 
-            # Создаем словарь для хранения названий товаров
+            
             product_names = {}
             
-            # Получаем список категорий
+            
             categories_response = requests.get("http://localhost:8000/categories/")
             if categories_response.status_code == 200:
                 categories = categories_response.json()
                 
-                # Для каждой категории получаем товары
+                
                 for category in categories:
                     products_response = requests.get(f"http://localhost:8000/products/by-category/{category['category_id']}")
                     if products_response.status_code == 200:
                         products = products_response.json()
-                        # Добавляем в словарь только нужные нам товары
+                        
                         for product in products:
                             if product["product_id"] in [item["product_id"] for item in purchase["items"]]:
                                 product_names[product["product_id"]] = product["product_name"]
 
-            # Отображаем информацию о товарах
+            
             for item in purchase["items"]:
                 product_id = item["product_id"]
                 self.details_tree.insert("", "end", values=(
