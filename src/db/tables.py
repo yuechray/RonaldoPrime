@@ -36,6 +36,7 @@ class ProductsTable(Base):
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.category_id"))
     date_price_change: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     new_price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    is_available: Mapped[bool] = mapped_column(default=True, nullable=False)
 
 class DeliveriesTable(Base):
     __tablename__ = "deliveries"

@@ -5,62 +5,70 @@ from sqlalchemy import select, text, func
 from src.api.dependencies import SessionFactoryDependency
 from src.db.tables import PurchasesTable, PurchaseItemsTable
 from src.models.purchases import PurchaseCreate, PurchaseModel, PurchaseItemModel
+from src.services.products import decrease_product_quantity
 
 async def create_purchase(
     session_factory: SessionFactoryDependency,
     purchase: PurchaseCreate
 ) -> PurchaseModel:
     async with session_factory() as session:
-        
-        result = await session.execute(select(func.max(PurchasesTable.purchase_id)))
-        max_id = result.scalar() or 0
-        next_id = max_id + 1
-        
-        
-        new_purchase = PurchasesTable(
-            purchase_id=next_id,
-            customer_id=purchase.customer_id,
-            store_id=purchase.store_id,
-            purchase_date=datetime.now()
-        )
-        session.add(new_purchase)
-        await session.flush()
-
-        
-        result = await session.execute(select(func.max(PurchaseItemsTable.purchase_items_id)))
-        max_item_id = result.scalar() or 0
-        next_item_id = max_item_id + 1
-
-        
-        items = []
-        for i, product in enumerate(purchase.products, start=0):
-            item = PurchaseItemsTable(
-                purchase_items_id=next_item_id + i,
-                purchases_id=new_purchase.purchase_id,
-                product_id=product.product_id,
-                product_count=1,  
-                product_price=product.price
+        try:
+            # Создаем новую покупку
+            result = await session.execute(select(func.max(PurchasesTable.purchase_id)))
+            max_id = result.scalar() or 0
+            next_id = max_id + 1
+            
+            new_purchase = PurchasesTable(
+                purchase_id=next_id,
+                customer_id=purchase.customer_id,
+                store_id=purchase.store_id,
+                purchase_date=datetime.now()
             )
-            session.add(item)
-            items.append(
-                PurchaseItemModel(
+            session.add(new_purchase)
+            await session.flush()
+
+            # Создаем записи о купленных товарах
+            result = await session.execute(select(func.max(PurchaseItemsTable.purchase_items_id)))
+            max_item_id = result.scalar() or 0
+            next_item_id = max_item_id + 1
+
+            items = []
+            for i, product in enumerate(purchase.products, start=0):
+                item = PurchaseItemsTable(
                     purchase_items_id=next_item_id + i,
                     purchases_id=new_purchase.purchase_id,
                     product_id=product.product_id,
                     product_count=1,
                     product_price=product.price
                 )
+                session.add(item)
+                items.append(
+                    PurchaseItemModel(
+                        purchase_items_id=next_item_id + i,
+                        purchases_id=new_purchase.purchase_id,
+                        product_id=product.product_id,
+                        product_count=1,
+                        product_price=product.price
+                    )
+                )
+
+            # Сначала коммитим создание покупки и записей о товарах
+            await session.commit()
+
+            # Теперь удаляем купленные товары
+            for product in purchase.products:
+                await decrease_product_quantity(session_factory, product.product_id)
+
+            return PurchaseModel(
+                purchase_id=new_purchase.purchase_id,
+                customer_id=new_purchase.customer_id,
+                store_id=new_purchase.store_id,
+                purchase_date=new_purchase.purchase_date,
+                items=items
             )
-
-        await session.commit()
-
-        return PurchaseModel(
-            purchase_id=new_purchase.purchase_id,
-            customer_id=new_purchase.customer_id,
-            store_id=new_purchase.store_id,
-            purchase_date=new_purchase.purchase_date,
-            items=items
-        )
+        except Exception as e:
+            await session.rollback()
+            raise e
 
 async def get_user_purchases(
     session_factory: SessionFactoryDependency,

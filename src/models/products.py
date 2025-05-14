@@ -9,6 +9,7 @@ class ProductsModel(BaseModel):
     category_id: int
     date_price_change: datetime
     new_price: float
+    is_available: bool = True
 
 class ProductCreate(BaseModel):
     product_name: str = Field(max_length=255)

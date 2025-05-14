@@ -98,14 +98,14 @@ class StoreApp(tk.Tk):
         products_frame = ttk.Frame(window)
         products_frame.pack(fill="both", expand=True, padx=10, pady=5)
         
-        cols = ("product_id", "product_name", "manufacturer_id", 
-                "category_id", "date_price_change", "new_price")
+        cols = ("product_id", "product_name", "manufacturer", 
+                "category", "date_price_change", "new_price")
         tree = ttk.Treeview(products_frame, columns=cols, show="headings", selectmode="extended")
         headers = {
             "product_id": "ID",
             "product_name": "Название",
-            "manufacturer_id": "Произв. ID",
-            "category_id": "Кат. ID",
+            "manufacturer": "Производитель",
+            "category": "Категория",
             "date_price_change": "Дата изм.",
             "new_price": "Цена"
         }
@@ -118,6 +118,20 @@ class StoreApp(tk.Tk):
         scrollbar.pack(side="right", fill="y")
         tree.pack(side="left", fill="both", expand=True)
 
+        
+        control_frame = ttk.Frame(window)
+        control_frame.pack(fill="x", padx=10, pady=5)
+
+        
+        edit_btn = ttk.Button(control_frame, text="Редактировать",
+                            command=lambda: self.edit_product(tree, window, category_id))
+        edit_btn.pack(side="left", padx=5)
+
+        delete_btn = ttk.Button(control_frame, text="Удалить",
+                             command=lambda: self.delete_product(tree, category_id))
+        delete_btn.pack(side="left", padx=5)
+
+        
         info_frame = ttk.Frame(window)
         info_frame.pack(fill="x", padx=10, pady=5)
 
@@ -128,32 +142,144 @@ class StoreApp(tk.Tk):
                           command=lambda: self.process_purchase(tree))
         buy_btn.pack(side="right", padx=5)
 
-        def update_total(event=None):
+        def update_buttons(event=None):
             selected_items = tree.selection()
             total = sum(float(tree.item(item)["values"][5]) for item in selected_items)
             total_label.config(text=f"Общая сумма: {total:.2f}")
             buy_btn.config(state="normal" if selected_items else "disabled")
+            
+            
+            if len(selected_items) == 1:
+                edit_btn.config(state="normal")
+                delete_btn.config(state="normal")
+            else:
+                edit_btn.config(state="disabled")
+                delete_btn.config(state="disabled")
 
-        tree.bind("<<TreeviewSelect>>", update_total)
+        tree.bind("<<TreeviewSelect>>", update_buttons)
 
         try:
+            
+            manufacturers_response = requests.get("http://localhost:8000/manufacturers/")
+            manufacturers = {m["manufacturer_id"]: m["manufacturer_name"] 
+                           for m in manufacturers_response.json()}
+
+            
+            categories_response = requests.get("http://localhost:8000/categories/")
+            categories = {c["category_id"]: c["category_name"] 
+                         for c in categories_response.json()}
+
+            
             resp = requests.get(f"http://localhost:8000/products/by-category/{category_id}")
             resp.raise_for_status()
             products = resp.json()
+
+            for p in products:
+                tree.insert("", "end", values=(
+                    p.get("product_id"),
+                    p.get("product_name"),
+                    manufacturers.get(p.get("manufacturer_id"), f"Производитель {p.get('manufacturer_id')}"),
+                    categories.get(p.get("category_id"), f"Категория {p.get('category_id')}"),
+                    p.get("date_price_change") or "",
+                    p.get("new_price") or ""
+                ))
+
         except requests.RequestException as e:
-            messagebox.showerror("Ошибка", f"Не удалось загрузить товары:\n{e}")
+            messagebox.showerror("Ошибка", f"Не удалось загрузить данные:\n{e}")
             window.destroy()
             return
 
-        for p in products:
-            tree.insert("", "end", values=(
-                p.get("product_id"),
-                p.get("product_name"),
-                p.get("manufacturer_id"),
-                p.get("category_id"),
-                p.get("date_price_change") or "",
-                p.get("new_price") or ""
-            ))
+        
+        edit_btn.config(state="disabled")
+        delete_btn.config(state="disabled")
+
+    def edit_product(self, tree, parent_window, category_id):
+        selected_items = tree.selection()
+        if not selected_items:
+            return
+            
+        item = tree.item(selected_items[0])
+        values = item["values"]
+        
+        edit_window = tk.Toplevel(parent_window)
+        edit_window.title("Редактировать товар")
+        edit_window.geometry("400x300")
+        
+        ttk.Label(edit_window, text="Название товара:").pack(pady=5)
+        name_entry = ttk.Entry(edit_window)
+        name_entry.insert(0, values[1])
+        name_entry.pack(pady=5)
+        
+        ttk.Label(edit_window, text="Производитель (ID):").pack(pady=5)
+        manufacturer_entry = ttk.Entry(edit_window)
+        manufacturer_entry.insert(0, values[2])
+        manufacturer_entry.pack(pady=5)
+        
+        ttk.Label(edit_window, text="Цена:").pack(pady=5)
+        price_entry = ttk.Entry(edit_window)
+        price_entry.insert(0, values[5])
+        price_entry.pack(pady=5)
+        
+        def save_changes():
+            try:
+                product_data = {
+                    "product_name": name_entry.get().strip(),
+                    "manufacturer_id": int(manufacturer_entry.get().strip()),
+                    "category_id": category_id,
+                    "new_price": float(price_entry.get().strip()),
+                    "date_price_change": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
+                
+                response = requests.put(
+                    f"http://localhost:8000/products/{values[0]}",
+                    json=product_data
+                )
+                
+                if response.status_code == 200:
+                    messagebox.showinfo("Успех", "Товар успешно обновлен")
+                    edit_window.destroy()
+                    
+                    tree.item(selected_items[0], values=(
+                        values[0],
+                        product_data["product_name"],
+                        product_data["manufacturer_id"],
+                        product_data["category_id"],
+                        product_data["date_price_change"],
+                        product_data["new_price"]
+                    ))
+                else:
+                    messagebox.showerror("Ошибка", response.json().get("detail", "Неизвестная ошибка"))
+                    
+            except ValueError:
+                messagebox.showerror("Ошибка", "Проверьте правильность введенных данных")
+            except requests.RequestException as e:
+                messagebox.showerror("Ошибка", f"Ошибка при обновлении товара:\n{e}")
+        
+        ttk.Button(edit_window, text="Сохранить", command=save_changes).pack(pady=20)
+        ttk.Button(edit_window, text="Отмена", command=edit_window.destroy).pack()
+
+    def delete_product(self, tree, category_id):
+        selected_items = tree.selection()
+        if not selected_items:
+            return
+            
+        item = tree.item(selected_items[0])
+        product_id = item["values"][0]
+        
+        if not messagebox.askyesno("Подтверждение", "Вы уверены, что хотите удалить этот товар?"):
+            return
+            
+        try:
+            response = requests.delete(f"http://localhost:8000/products/{product_id}")
+            
+            if response.status_code == 200:
+                messagebox.showinfo("Успех", "Товар успешно удален")
+                tree.delete(selected_items[0])
+            else:
+                messagebox.showerror("Ошибка", response.json().get("detail", "Неизвестная ошибка"))
+                
+        except requests.RequestException as e:
+            messagebox.showerror("Ошибка", f"Ошибка при удалении товара:\n{e}")
 
     def process_purchase(self, tree):
         selected_items = tree.selection()
@@ -165,8 +291,8 @@ class StoreApp(tk.Tk):
         for item in selected_items:
             values = tree.item(item)["values"]
             products.append({
-                "product_id": values[0],
-                "product_name": values[1],
+                "product_id": int(values[0]),
+                "product_name": str(values[1]),
                 "price": float(values[5])
             })
             total_sum += float(values[5])
@@ -186,10 +312,14 @@ class StoreApp(tk.Tk):
             )
             
             if response.status_code == 200:
+                
+                for item in selected_items:
+                    tree.delete(item)
                 messagebox.showinfo("Успех", "Покупка успешно оформлена!")
-                self.load_purchases()
+                self.load_purchases()  
             else:
-                messagebox.showerror("Ошибка", response.json().get("detail", "Неизвестная ошибка"))
+                error_detail = response.json().get("detail", "Неизвестная ошибка")
+                messagebox.showerror("Ошибка", f"Ошибка при оформлении покупки: {error_detail}")
 
         except requests.RequestException as e:
             messagebox.showerror("Ошибка", f"Ошибка при оформлении покупки:\n{e}")
@@ -411,29 +541,25 @@ class StoreApp(tk.Tk):
                 return
 
             
-            product_names = {}
-            
-            
-            categories_response = requests.get("http://localhost:8000/categories/")
-            if categories_response.status_code == 200:
-                categories = categories_response.json()
-                
-                
-                for category in categories:
-                    products_response = requests.get(f"http://localhost:8000/products/by-category/{category['category_id']}")
-                    if products_response.status_code == 200:
-                        products = products_response.json()
-                        
-                        for product in products:
-                            if product["product_id"] in [item["product_id"] for item in purchase["items"]]:
-                                product_names[product["product_id"]] = product["product_name"]
-
-            
             for item in purchase["items"]:
                 product_id = item["product_id"]
+                try:
+                    
+                    product_response = requests.get(
+                        f"http://localhost:8000/products/{product_id}",
+                        params={"include_unavailable": True}
+                    )
+                    if product_response.status_code == 200:
+                        product = product_response.json()
+                        product_name = product["product_name"]
+                    else:
+                        product_name = f"Товар {product_id}"
+                except:
+                    product_name = f"Товар {product_id}"
+
                 self.details_tree.insert("", "end", values=(
                     product_id,
-                    product_names.get(product_id, f"Товар {product_id}"),
+                    product_name,
                     item.get("product_count", 1),
                     f"{item['product_price']:.2f}"
                 ))
