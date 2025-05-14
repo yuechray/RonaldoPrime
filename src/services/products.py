@@ -12,10 +12,17 @@ async def get_products_by_category(session_factory: SessionFactoryDependency, ca
         query = select(ProductsTable).where(ProductsTable.category_id == category_id)
         result = await session.execute(query)
         products = result.scalars().all()
-    return [
-        ProductsModel.model_validate(prod, from_attributes=True)
-        for prod in products
-    ]
+        return [
+            ProductsModel.model_validate(prod, from_attributes=True)
+            for prod in products
+        ]
+
+async def get_products_by_ids(session_factory: SessionFactoryDependency, product_ids: List[int]) -> List[ProductsModel]:
+    async with session_factory() as session:
+        query = select(ProductsTable).where(ProductsTable.product_id.in_(product_ids))
+        result = await session.execute(query)
+        products = result.scalars().all()
+        return [ProductsModel.model_validate(product) for product in products]
 
 async def create_product(
     session_factory: SessionFactoryDependency,
