@@ -1,13 +1,14 @@
 from functools import lru_cache
 
-
-from src.core.settings import get_app_settings
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+
+from src.core.settings import Settings, get_app_settings
 
 
 class Postgres:
@@ -24,7 +25,7 @@ def get_postgres_manager(postgres_dsn: str):
 
 
 async def get_async_session_factory(
-        settings = get_app_settings()
+        settings: Settings = Depends(get_app_settings)
 ) -> async_sessionmaker[AsyncSession]:
     postgres = get_postgres_manager(settings.postgres_dsn)
 
