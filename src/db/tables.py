@@ -30,7 +30,7 @@ class StoresTable(Base):
 class ProductsTable(Base):
     __tablename__ = "products"
 
-    product_id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     product_name: Mapped[str] = mapped_column(String(255), nullable=False)
     manufacturer_id: Mapped[int] = mapped_column(ForeignKey("manufacturers.manufacturer_id"))
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.category_id"))

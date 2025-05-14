@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import requests
+from datetime import datetime
 
 
 class LoginWindow(tk.Tk):
@@ -167,29 +168,111 @@ class StoreApp(tk.Tk):
 
     def create_add_product_tab(self, notebook):
         frame = ttk.Frame(notebook)
+        frame.columnconfigure(1, weight=1)  # Для растягивания полей ввода
 
-        ttk.Label(frame, text="Название товара:").pack()
-        self.name_entry = tk.Entry(frame)
-        self.name_entry.pack()
+        # Название товара
+        ttk.Label(frame, text="Название товара:").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+        self.name_entry = ttk.Entry(frame)
+        self.name_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
-        ttk.Label(frame, text="Производитель (ID):").pack()
-        self.manufacturer_entry = tk.Entry(frame)
-        self.manufacturer_entry.pack()
+        # Производитель
+        ttk.Label(frame, text="Производитель (ID):").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+        self.manufacturer_entry = ttk.Entry(frame)
+        self.manufacturer_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 
-        ttk.Label(frame, text="Категория (ID):").pack()
-        self.category_entry = tk.Entry(frame)
-        self.category_entry.pack()
+        # Категория
+        ttk.Label(frame, text="Категория:").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+        self.category_combo = ttk.Combobox(frame, state="readonly")
+        self.category_combo.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
+        self.load_categories()  # Загружаем список категорий
 
-        ttk.Label(frame, text="Цена:").pack()
-        self.price_entry = tk.Entry(frame)
-        self.price_entry.pack()
+        # Цена
+        ttk.Label(frame, text="Цена:").grid(row=3, column=0, padx=5, pady=5, sticky="e")
+        self.price_entry = ttk.Entry(frame)
+        self.price_entry.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
 
-        ttk.Button(frame, text="Добавить товар", command=self.add_product).pack(pady=10)
+        # Дата изменения цены
+        ttk.Label(frame, text="Дата изменения цены:").grid(row=4, column=0, padx=5, pady=5, sticky="e")
+        self.date_entry = ttk.Entry(frame)
+        self.date_entry.grid(row=4, column=1, padx=5, pady=5, sticky="ew")
+        self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+        # Кнопка добавления
+        ttk.Button(frame, text="Добавить товар", command=self.add_product).grid(row=5, column=0, columnspan=2, pady=20)
+
         return frame
 
+    def load_categories(self):
+        try:
+            response = requests.get("http://localhost:8000/categories/")
+            response.raise_for_status()
+            categories = response.json()
+            
+            # Создаем словарь для хранения id категорий
+            self.category_ids = {cat["category_name"]: cat["category_id"] for cat in categories}
+            
+            # Заполняем комбобокс названиями категорий
+            self.category_combo["values"] = list(self.category_ids.keys())
+            
+            if self.category_combo["values"]:
+                self.category_combo.current(0)  # Выбираем первую категорию
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить категории:\n{e}")
+
     def add_product(self):
-        # TODO: Отправить данные на сервер (product + price_change)
-        messagebox.showinfo("Успех", "Товар добавлен (заглушка)")
+        # Получаем данные из полей ввода
+        product_name = self.name_entry.get().strip()
+        manufacturer_id = self.manufacturer_entry.get().strip()
+        category_name = self.category_combo.get()
+        price = self.price_entry.get().strip()
+        date_str = self.date_entry.get().strip()
+
+        # Проверяем заполнение всех полей
+        if not all([product_name, manufacturer_id, category_name, price, date_str]):
+            messagebox.showerror("Ошибка", "Пожалуйста, заполните все поля")
+            return
+
+        try:
+            # Преобразуем значения
+            manufacturer_id = int(manufacturer_id)
+            price = float(price)
+            category_id = self.category_ids[category_name]
+            
+            try:
+                date_price_change = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                messagebox.showerror("Ошибка", "Неверный формат даты. Используйте формат: ГГГГ-ММ-ДД ЧЧ:ММ:СС")
+                return
+
+            # Отправляем запрос на создание продукта
+            response = requests.post(
+                "http://localhost:8000/products/",
+                json={
+                    "product_name": product_name,
+                    "manufacturer_id": manufacturer_id,
+                    "category_id": category_id,
+                    "new_price": price,
+                    "date_price_change": date_str
+                }
+            )
+            
+            if response.status_code == 200:
+                messagebox.showinfo("Успех", "Товар успешно добавлен")
+                # Очищаем поля
+                self.name_entry.delete(0, tk.END)
+                self.manufacturer_entry.delete(0, tk.END)
+                self.price_entry.delete(0, tk.END)
+                self.date_entry.delete(0, tk.END)
+                self.date_entry.insert(0, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            else:
+                messagebox.showerror("Ошибка", response.json().get("detail", "Неизвестная ошибка"))
+
+        except ValueError:
+            messagebox.showerror("Ошибка", "Проверьте правильность введенных данных:\n- ID производителя должен быть целым числом\n- Цена должна быть числом")
+        except requests.RequestException as e:
+            messagebox.showerror("Ошибка", f"Ошибка при отправке запроса:\n{e}")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Неизвестная ошибка:\n{e}")
 
     def create_purchases_tab(self, notebook):
         frame = ttk.Frame(notebook)
