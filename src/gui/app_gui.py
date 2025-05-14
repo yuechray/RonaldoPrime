@@ -12,11 +12,12 @@ class LoginWindow(tk.Tk):
         tk.Label(self, text="Логин:").pack(pady=(40, 10))
         self.username_entry = tk.Entry(self)
         self.username_entry.pack()
+        self.username_entry.insert(0,"admin@test.com")
 
         tk.Label(self, text="Пароль:").pack(pady=10)
         self.password_entry = tk.Entry(self, show="*")
         self.password_entry.pack()
-
+        self.password_entry.insert(0,"admin")
         tk.Button(self, text="Войти", command=self.login).pack(pady=30)
 
     def login(self):
@@ -62,61 +63,91 @@ class StoreApp(tk.Tk):
         notebook.add(self.purchase_tab, text="🧾 Покупки")
 
     def create_category_tab(self, notebook):
+
         frame = ttk.Frame(notebook)
         ttk.Label(frame, text="Выберите категорию:", font=("Arial", 12)).pack(pady=10)
 
-        self.category_combobox = ttk.Combobox(frame, state="readonly", width=20)
-        self.category_combobox.pack(pady=5)
+        try:
+            resp = requests.get("http://localhost:8000/categories/")
+            resp.raise_for_status()
+            categories = resp.json()
+        except requests.RequestException as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить категории:\n{e}")
+            categories = []
 
-       
-        self.load_categories()
+        if not categories:
+            ttk.Label(frame, text="Категорий нет").pack(pady=10)
+            return frame
 
-        self.category_combobox.bind("<<ComboboxSelected>>", self.open_category_window)
+        
+        for cat in categories:
+            cid  = cat["category_id"]
+            name = cat["category_name"]
+            
+            btn = ttk.Button(
+                frame,
+                text=name,
+                command=lambda cid=cid, name=name: self.open_category_window(cid, name)
+            )
+            btn.pack(fill="x", padx=50, pady=5)
         return frame
 
-    def load_categories(self):
-        try:
-            response = requests.get("http://localhost:8000/categories/")  # Запрос на все категории
-            response.raise_for_status()  # Это вызовет исключение, если ответ не 200
-            categories = response.json()
-
-            # Заполнение Combobox категориями
-            category_names = [category['category_name'] for category in categories]
-            self.category_combobox['values'] = category_names
-
-        except requests.exceptions.RequestException as e:
-            messagebox.showerror("Ошибка", f"Не удалось загрузить категории: {e}")
-
-    def open_category_window(self, event):
-        category_name = self.category_combobox.get()
+    def open_category_window(self, category_id: int, category_name: str):
         window = tk.Toplevel(self)
-        window.title(f"Товары категории: {category_name}")
-        window.geometry("700x400")
+        window.title(f"Товары: {category_name}")
+        window.geometry("800x450")
 
-        tree = ttk.Treeview(window, columns=("id", "name", "price", "stock"), show="headings")
-        tree.heading("id", text="ID")
-        tree.heading("name", text="Название")
-        tree.heading("price", text="Цена")
-        tree.heading("stock", text="Остаток")
-        tree.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        cols = ("product_id", "product_name", "manufacturer_id", 
+                "category_id", "date_price_change", "new_price")
+        tree = ttk.Treeview(window, columns=cols, show="headings", selectmode="browse")
+        headers = {
+            "product_id": "ID",
+            "product_name": "Название",
+            "manufacturer_id": "Произв. ID",
+            "category_id": "Кат. ID",
+            "date_price_change": "Дата изм.",
+            "new_price": "Цена"
+        }
+        for c in cols:
+            tree.heading(c, text=headers[c])
+            tree.column(c, anchor="center", stretch=True)
+        tree.pack(fill="both", expand=True, padx=10, pady=(10,0))
 
-        # Запрос к API для получения товаров по выбранной категории
+       
+        buy_btn = ttk.Button(window, text=" Купить", state="disabled",
+                             command=lambda: self.on_buy(tree))
+        buy_btn.pack(pady=10)
+
+        
+        def on_select(event):
+            buy_btn.config(state="normal" if tree.selection() else "disabled")
+        tree.bind("<<TreeviewSelect>>", on_select)
+
+        
         try:
-            # Ищем category_id, получаем его по имени категории
-            category_id = self.get_category_id_by_name(category_name)
-            if category_id is None:
-                messagebox.showerror("Ошибка", "Не удалось найти категорию.")
-                return
+            resp = requests.get(f"http://localhost:8000/products/by-category/{category_id}")
+            resp.raise_for_status()
+            products = resp.json()
+        except requests.RequestException as e:
+            messagebox.showerror("Ошибка", f"Не удалось загрузить товары:\n{e}")
+            window.destroy()
+            return
 
-            response = requests.get(f"http://localhost:8000/products/by-category/{category_id}")
-            response.raise_for_status()  # Это вызовет исключение, если ответ не 200
-            products = response.json()
+       
+        for p in products:
+            tree.insert("", "end", values=(
+                p.get("product_id"),
+                p.get("product_name"),
+                p.get("manufacturer_id"),
+                p.get("category_id"),
+                p.get("date_price_change") or "",
+                p.get("new_price") or ""
+            ))
 
-            for product in products:
-                tree.insert("", "end", values=(product['product_id'], product['product_name'], product['new_price'], product['stock']))
+    
 
-        except requests.exceptions.RequestException as e:
-            messagebox.showerror("Ошибка", f"Не удалось загрузить товары: {e}")
+
 
     def get_category_id_by_name(self, category_name: str):
         # Получаем ID категории по её имени (этот запрос можно оптимизировать)
